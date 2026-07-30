@@ -1,0 +1,517 @@
+<!DOCTYPE html><html lang="id"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cek Ongkir</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #f4f1ec;
+    margin: 0;
+    padding: 20px;
+    color: #2a2a2a;
+  }
+  .card {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    color: #7a1f2b;
+  }
+  p.sub {
+    font-size: 13px;
+    color: #777;
+    margin: 0 0 18px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    background: #f4f1ec;
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+  }
+  .tab.active {
+    background: #7a1f2b;
+    color: #fff;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .input-wrap {
+    position: relative;
+  }
+  textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px;
+    padding-right: 38px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 15px;
+    resize: vertical;
+  }
+  #btnClear {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: #e8e2d8;
+    color: #7a1f2b;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: none;
+  }
+  #btnClear.show { display: block; }
+  button.main {
+    width: 100%;
+    margin-top: 12px;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: #7a1f2b;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  button.main:disabled { opacity: 0.6; }
+  .result {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 10px;
+    background: #f9f6f0;
+    border: 1px solid #e8dfd0;
+    display: none;
+  }
+  .result.show { display: block; }
+  .result.error {
+    background: #fdf1f1;
+    border-color: #f3c9c9;
+    color: #8a2a2a;
+  }
+  .argo {
+    font-size: 30px;
+    font-weight: 800;
+    color: #7a1f2b;
+  }
+  .detail {
+    font-size: 13px;
+    color: #666;
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+  .coord {
+    font-size: 12px;
+    color: #999;
+    word-break: break-all;
+    margin-top: 10px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .row button {
+    margin-top: 0;
+    font-size: 13px;
+    padding: 10px;
+    background: #444;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    flex: 1;
+  }
+  .status {
+    font-size: 13px;
+    color: #999;
+    margin-top: 10px;
+    text-align: center;
+  }
+  .disclaimer {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 16px;
+    text-align: center;
+    line-height: 1.5;
+  }
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7a1f2b">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cek Ongkir">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Cek Ongkir</h1>
+    <p class="sub">Pilih salah satu cara di bawah buat lihat estimasi ongkirnya. Kolom "Paste Link Lokasi" bisa isi link Maps, koordinat, atau langsung angka km.</p>
+
+    <div class="tabs">
+      <div class="tab active" id="tabLink">Paste Link Lokasi</div>
+      <div class="tab" id="tabGps">Cek Otomatis</div>
+    </div>
+
+    <!-- METODE 1: Paste link / koordinat / angka km (dipakai driver/Angga) -->
+    <div class="panel active" id="panelLink">
+      <div class="input-wrap">
+        <textarea id="input" placeholder="Paste link Maps, koordinat (-7.1,107.9), atau angka km (misal 1.3)"></textarea>
+        <button type="button" id="btnClear" title="Hapus isi">✕</button>
+      </div>
+      <button class="main" id="btnCheckLink">Cek Ongkir</button>
+    </div>
+
+    <!-- METODE 2: GPS langsung (dipakai pelanggan sendiri) -->
+    <div class="panel" id="panelGps">
+      <button class="main" id="btnCheckGps">📍 Cek Otomatis</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="result" id="result">
+      <div class="argo" id="argoText">-</div>
+      <div class="detail" id="detailText"></div>
+      <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
+      <div class="coord" id="coordText"></div>
+      <div class="row" id="rowActions" style="display:none;">
+        <button id="btnCopy">Copy Koordinat</button>
+        <button id="btnMaps">Buka di Maps</button>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      Ini estimasi berdasarkan jarak rute jalan dari toko, belum tentu 100% sama dengan ongkir final.
+    </div>
+  </div>
+
+<script>
+// URL Web App Apps Script Jasfood — sama seperti yang dipakai customer app "Order Jasfood"
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyihpo7zauTLO103oHU6nzICzITeC82F0gG7bHXPNHeaRRpI5o-yg-qnh1LNEwoKt9V/exec';
+
+const tabLink = document.getElementById('tabLink');
+const tabGps = document.getElementById('tabGps');
+const panelLink = document.getElementById('panelLink');
+const panelGps = document.getElementById('panelGps');
+const input = document.getElementById('input');
+const btnClear = document.getElementById('btnClear');
+const btnCheckLink = document.getElementById('btnCheckLink');
+const btnCheckGps = document.getElementById('btnCheckGps');
+const btnCopy = document.getElementById('btnCopy');
+const btnMaps = document.getElementById('btnMaps');
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+const argoText = document.getElementById('argoText');
+const detailText = document.getElementById('detailText');
+const coordText = document.getElementById('coordText');
+const mapBox = document.getElementById('mapBox');
+let petaInstance = null;
+let layerRute = null;
+const rowActions = document.getElementById('rowActions');
+
+let cacheToko = null;
+let cacheKonf = null;
+let lastCoord = null;
+
+function toggleBtnClear() {
+  btnClear.classList.toggle('show', input.value.trim().length > 0);
+}
+input.addEventListener('input', toggleBtnClear);
+toggleBtnClear();
+
+btnClear.addEventListener('click', () => {
+  input.value = '';
+  toggleBtnClear();
+  resetResult();
+  input.focus();
+});
+
+tabLink.addEventListener('click', () => {
+  tabLink.classList.add('active'); tabGps.classList.remove('active');
+  panelLink.classList.add('active'); panelGps.classList.remove('active');
+  resetResult();
+});
+tabGps.addEventListener('click', () => {
+  tabGps.classList.add('active'); tabLink.classList.remove('active');
+  panelGps.classList.add('active'); panelLink.classList.remove('active');
+  resetResult();
+});
+
+function resetResult() {
+  statusEl.textContent = '';
+  resultEl.classList.remove('show', 'error');
+}
+
+// ---------- Parsing koordinat dari link ----------
+function tryDirectParse(text) {
+  let m = text.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  m = text.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  m = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  m = text.trim().match(/^(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)$/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  return null;
+}
+
+function isJarakKm(text) {
+  var t = text.trim().toLowerCase().replace(',', '.');
+  var m = t.match(/^(\d+(\.\d+)?)\s*km$/) || t.match(/^(\d+(\.\d+)?)$/);
+  if (!m) return null;
+  var km = parseFloat(m[1]);
+  if (isNaN(km) || km < 0) return null;
+  return km;
+}
+
+async function prosesJarakManual(km) {
+  statusEl.textContent = 'Mengambil tarif...';
+  const konf = await ambilKonfigurasi();
+  const ongkir = hitungOngkir(km, konf);
+
+  lastCoord = null;
+  argoText.textContent = formatRupiah(ongkir);
+  detailText.textContent = `Jarak input manual: ${km.toFixed(1)} km`;
+  coordText.textContent = '';
+  rowActions.style.display = 'none';
+  resultEl.classList.add('show');
+  statusEl.textContent = '';
+}
+
+function isUrl(text) {
+  return /^https?:\/\//i.test(text.trim());
+}
+
+async function resolveViaAppsScript(url) {
+  const endpoint = SCRIPT_URL + '?action=resolveLink&url=' + encodeURIComponent(url);
+  const res = await fetch(endpoint);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { lat: parseFloat(data.lat), lng: parseFloat(data.lng) };
+}
+
+function ambilPosisiGps() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('HP/browser kamu tidak mendukung fitur lokasi.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      err => reject(new Error('Gagal mengambil lokasi: ' + err.message + '. Pastikan izin lokasi diaktifkan.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 8000 }
+    );
+  });
+}
+
+// ---------- Data toko & konfigurasi (di-cache per sesi) ----------
+async function ambilToko() {
+  if (cacheToko) return cacheToko;
+  const res = await fetch(SCRIPT_URL + '?action=getLokasiToko');
+  const data = await res.json();
+  if (!data.toko || !data.toko.length) throw new Error('Koordinat toko belum diisi di sheet Lokasi_Toko.');
+  cacheToko = data.toko[0];
+  return cacheToko;
+}
+
+async function ambilKonfigurasi() {
+  if (cacheKonf) return cacheKonf;
+  const res = await fetch(SCRIPT_URL + '?action=getKonfigurasi');
+  const data = await res.json();
+  cacheKonf = {
+    tarif_per_km: Number(data.tarif_per_km) || 2000,
+    ongkir_minimum: Number(data.ongkir_minimum) || 5000,
+    batas_km_flat: Number(data.batas_km_flat) || 2,
+    ongkir_flat: Number(data.ongkir_flat) || 3000
+  };
+  return cacheKonf;
+}
+
+async function hitungRute(lat1, lng1, lat2, lng2) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) throw new Error('Tidak bisa menghitung rute.');
+  const rute = data.routes[0];
+  return {
+    km: rute.distance / 1000,
+    // geometry.coordinates formatnya [lng, lat] - dibalik jadi [lat, lng]
+    titikRute: rute.geometry.coordinates.map(c => [c[1], c[0]])
+  };
+}
+
+function hitungOngkir(km, konf) {
+  if (km < konf.batas_km_flat) return konf.ongkir_flat;
+  return Math.max(km * konf.tarif_per_km, konf.ongkir_minimum);
+}
+
+function formatRupiah(angka) {
+  return 'Rp' + Math.round(angka).toLocaleString('id-ID');
+}
+
+function tampilkanPeta(toko, tujuan, titikRute) {
+  mapBox.style.display = 'block';
+
+  // Inisialisasi peta cuma sekali; kunjungan berikutnya tinggal update isinya
+  if (!petaInstance) {
+    petaInstance = L.map(mapBox);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(petaInstance);
+  }
+
+  if (layerRute) { petaInstance.removeLayer(layerRute); }
+
+  // Pin custom dari CSS doang (bukan gambar dari CDN luar) - biar gak mungkin
+  // gagal muat kayak masalah peta statis sebelumnya. Biru = toko, merah = tujuan.
+  function buatPin(warna) {
+    return L.divIcon({
+      className: '',
+      html: `<div style="width:20px; height:20px; border-radius:50% 50% 50% 0; background:${warna}; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 20],
+      popupAnchor: [0, -20]
+    });
+  }
+
+  const garisRute = L.polyline(titikRute, { color: '#7a1f2b', weight: 4 });
+  const markerToko = L.marker([toko.lat, toko.lng], { icon: buatPin('#2196f3') }).bindPopup((toko.nama || 'Toko') + ' (toko)');
+  const markerTujuan = L.marker([tujuan.lat, tujuan.lng], { icon: buatPin('#e0392b') }).bindPopup('Tujuan');
+
+  layerRute = L.layerGroup([garisRute, markerToko, markerTujuan]).addTo(petaInstance);
+
+  // Leaflet butuh tau ukuran kontainer yang BENAR dulu (yang tadinya display:none)
+  // sebelum baru boleh fitBounds - kalau kebalik, zoom-nya salah hitung dan hasilnya
+  // zoom-out kejauhan kayak yang dialami Angga.
+  setTimeout(() => {
+    petaInstance.invalidateSize();
+    petaInstance.fitBounds(garisRute.getBounds(), { padding: [20, 20] });
+  }, 150);
+
+}
+
+// ---------- Alur bareng: dari koordinat tujuan -> tampilkan hasil ----------
+async function prosesTujuan(tujuan, tampilkanAksi) {
+  statusEl.textContent = 'Mengambil data toko & tarif...';
+  const [toko, konf] = await Promise.all([ambilToko(), ambilKonfigurasi()]);
+
+  statusEl.textContent = 'Menghitung jarak & rute...';
+  const { km, titikRute } = await hitungRute(toko.lat, toko.lng, tujuan.lat, tujuan.lng);
+  const ongkir = hitungOngkir(km, konf);
+
+  lastCoord = `${tujuan.lat},${tujuan.lng}`;
+  argoText.textContent = formatRupiah(ongkir);
+  detailText.textContent = `Jarak ± ${km.toFixed(1)} km dari ${toko.nama || 'toko'}`;
+  coordText.textContent = tampilkanAksi ? ('Koordinat: ' + lastCoord) : '';
+  rowActions.style.display = tampilkanAksi ? 'flex' : 'none';
+
+  tampilkanPeta(toko, tujuan, titikRute);
+
+  resultEl.classList.add('show');
+  statusEl.textContent = '';
+}
+
+function tampilkanError(err) {
+  resultEl.classList.add('show', 'error');
+  argoText.textContent = 'Gagal menghitung';
+  detailText.textContent = err.message;
+  coordText.textContent = '';
+  rowActions.style.display = 'none';
+  mapBox.style.display = 'none';
+}
+
+// ---------- Metode 1: paste link ----------
+btnCheckLink.addEventListener('click', async () => {
+  const text = input.value.trim();
+  resetResult();
+  if (!text) { statusEl.textContent = 'Paste dulu link atau koordinatnya.'; return; }
+
+  btnCheckLink.disabled = true;
+  try {
+    const km = isJarakKm(text);
+    if (km !== null) {
+      await prosesJarakManual(km);
+      return;
+    }
+
+    let tujuan = tryDirectParse(text);
+    if (!tujuan && isUrl(text)) {
+      statusEl.textContent = 'Membongkar link...';
+      tujuan = await resolveViaAppsScript(text);
+    }
+    if (!tujuan) throw new Error('Koordinat tidak ditemukan dari link/teks ini.');
+    await prosesTujuan(tujuan, true);
+  } catch (err) {
+    tampilkanError(err);
+  } finally {
+    btnCheckLink.disabled = false;
+  }
+});
+
+// ---------- Metode 2: bagikan lokasi GPS ----------
+btnCheckGps.addEventListener('click', async () => {
+  resetResult();
+  btnCheckGps.disabled = true;
+  try {
+    statusEl.textContent = 'Mengambil lokasimu...';
+    const posisi = await ambilPosisiGps();
+    await prosesTujuan(posisi, false);
+  } catch (err) {
+    tampilkanError(err);
+  } finally {
+    btnCheckGps.disabled = false;
+  }
+});
+
+btnCopy.addEventListener('click', () => {
+  if (!lastCoord) return;
+  navigator.clipboard.writeText(lastCoord).then(() => {
+    statusEl.textContent = 'Koordinat udah ke-copy!';
+    setTimeout(() => statusEl.textContent = '', 2000);
+  });
+});
+
+btnMaps.addEventListener('click', () => {
+  if (!lastCoord) return;
+  window.open(`https://www.google.com/maps?q=${lastCoord}`, '_blank');
+});
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" data-cf-beacon="{" version":"2024.11.0","token":"ff6daca8ec4d4bb5a0426e9fb464085c","r":1}"="" crossorigin="anonymous"></script>
+
+
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW gagal daftar:', err));
+  });
+}
+</script>
+</body></html>
