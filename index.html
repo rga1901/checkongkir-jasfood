@@ -125,6 +125,35 @@
     word-break: break-all;
     margin-top: 10px;
   }
+  .round-opt {
+    display: none;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e8dfd0;
+  }
+  .round-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7a1f2b;
+    cursor: pointer;
+    user-select: none;
+  }
+  .round-label input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    accent-color: #7a1f2b;
+    cursor: pointer;
+  }
+  .round-info {
+    display: none;
+    font-size: 12px;
+    color: #999;
+    margin-top: 6px;
+    margin-left: 25px;
+  }
   .row {
     display: flex;
     gap: 8px;
@@ -193,6 +222,13 @@
 
     <div class="result" id="result">
       <div class="argo" id="argoText">-</div>
+      <div class="round-opt" id="roundOpt">
+        <label class="round-label">
+          <input type="checkbox" id="chkBulat">
+          <span>Bulatkan Ongkir (ke Rp1.000 terdekat)</span>
+        </label>
+        <div class="round-info" id="roundInfo"></div>
+      </div>
       <div class="detail" id="detailText"></div>
       <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
       <div class="coord" id="coordText"></div>
@@ -230,10 +266,14 @@ const mapBox = document.getElementById('mapBox');
 let petaInstance = null;
 let layerRute = null;
 const rowActions = document.getElementById('rowActions');
+const roundOpt = document.getElementById('roundOpt');
+const chkBulat = document.getElementById('chkBulat');
+const roundInfo = document.getElementById('roundInfo');
 
 let cacheToko = null;
 let cacheKonf = null;
 let lastCoord = null;
+let ongkirAsli = null; // nilai ongkir hasil hitung asli (belum dibulatkan)
 
 function toggleBtnClear() {
   btnClear.classList.toggle('show', input.value.trim().length > 0);
@@ -262,6 +302,7 @@ tabGps.addEventListener('click', () => {
 function resetResult() {
   statusEl.textContent = '';
   resultEl.classList.remove('show', 'error');
+  roundOpt.style.display = 'none';
 }
 
 // ---------- Parsing koordinat dari link ----------
@@ -296,7 +337,9 @@ async function prosesJarakManual(km) {
   const ongkir = hitungOngkir(km, konf);
 
   lastCoord = null;
-  argoText.textContent = formatRupiah(ongkir);
+  ongkirAsli = ongkir;
+  roundOpt.style.display = 'block';
+  renderOngkir();
   detailText.textContent = `Jarak input manual: ${km.toFixed(1)} km`;
   coordText.textContent = '';
   rowActions.style.display = 'none';
@@ -375,6 +418,29 @@ function formatRupiah(angka) {
   return 'Rp' + Math.round(angka).toLocaleString('id-ID');
 }
 
+// ---------- Pembulatan ongkir (tampilan saja, tidak mengubah rumus asli) ----------
+function bulatkanOngkir(angka) {
+  const dasar = Math.floor(angka / 1000) * 1000;
+  const sisa = angka - dasar;
+  return sisa < 500 ? dasar : dasar + 1000;
+}
+
+function renderOngkir() {
+  if (ongkirAsli === null) return;
+  if (chkBulat.checked) {
+    const dibulatkan = bulatkanOngkir(ongkirAsli);
+    argoText.textContent = formatRupiah(dibulatkan);
+    roundInfo.textContent = 'Ongkir asli: ' + formatRupiah(ongkirAsli);
+    roundInfo.style.display = 'block';
+  } else {
+    argoText.textContent = formatRupiah(ongkirAsli);
+    roundInfo.textContent = '';
+    roundInfo.style.display = 'none';
+  }
+}
+
+chkBulat.addEventListener('change', renderOngkir);
+
 function tampilkanPeta(toko, tujuan, titikRute) {
   mapBox.style.display = 'block';
 
@@ -427,7 +493,9 @@ async function prosesTujuan(tujuan, tampilkanAksi) {
   const ongkir = hitungOngkir(km, konf);
 
   lastCoord = `${tujuan.lat},${tujuan.lng}`;
-  argoText.textContent = formatRupiah(ongkir);
+  ongkirAsli = ongkir;
+  roundOpt.style.display = 'block';
+  renderOngkir();
   detailText.textContent = `Jarak ± ${km.toFixed(1)} km dari ${toko.nama || 'toko'}`;
   coordText.textContent = tampilkanAksi ? ('Koordinat: ' + lastCoord) : '';
   rowActions.style.display = tampilkanAksi ? 'flex' : 'none';
@@ -440,6 +508,8 @@ async function prosesTujuan(tujuan, tampilkanAksi) {
 
 function tampilkanError(err) {
   resultEl.classList.add('show', 'error');
+  ongkirAsli = null;
+  roundOpt.style.display = 'none';
   argoText.textContent = 'Gagal menghitung';
   detailText.textContent = err.message;
   coordText.textContent = '';
