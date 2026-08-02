@@ -225,9 +225,7 @@
       <div class="round-opt" id="roundOpt">
         <label class="round-label">
           <input type="checkbox" id="chkBulat">
-          <span>Bulatkan Ongkir (ke Rp1.000 terdekat)</span>
         </label>
-        <div class="round-info" id="roundInfo"></div>
       </div>
       <div class="detail" id="detailText"></div>
       <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
@@ -268,7 +266,6 @@ let layerRute = null;
 const rowActions = document.getElementById('rowActions');
 const roundOpt = document.getElementById('roundOpt');
 const chkBulat = document.getElementById('chkBulat');
-const roundInfo = document.getElementById('roundInfo');
 
 let cacheToko = null;
 let cacheKonf = null;
@@ -430,12 +427,8 @@ function renderOngkir() {
   if (chkBulat.checked) {
     const dibulatkan = bulatkanOngkir(ongkirAsli);
     argoText.textContent = formatRupiah(dibulatkan);
-    roundInfo.textContent = 'Ongkir asli: ' + formatRupiah(ongkirAsli);
-    roundInfo.style.display = 'block';
   } else {
     argoText.textContent = formatRupiah(ongkirAsli);
-    roundInfo.textContent = '';
-    roundInfo.style.display = 'none';
   }
 }
 
