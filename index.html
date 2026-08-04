@@ -24,6 +24,26 @@
     margin: 0 0 4px;
     color: #7a1f2b;
   }
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .btn-jasfood {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 12px;
+    background: #7a1f2b;
+    color: #fff;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
   p.sub {
     font-size: 13px;
     color: #777;
@@ -196,7 +216,10 @@
 </head>
 <body>
   <div class="card">
-    <h1>Cek Ongkir</h1>
+    <div class="top-row">
+      <h1>Cek Ongkir</h1>
+      <a class="btn-jasfood" href="https://jasfood.my.id" target="_blank" rel="noopener">↗ Jasfood</a>
+    </div>
     <p class="sub">Pilih salah satu cara di bawah buat lihat estimasi ongkirnya. Kolom "Paste Link Lokasi" bisa isi link Maps, koordinat, atau langsung angka km.</p>
 
     <div class="tabs">
