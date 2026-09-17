@@ -195,6 +195,7 @@
     margin-top: 10px;
     text-align: center;
   }
+  #mapBox.klik-aktif { cursor: crosshair; }
   .disclaimer {
     font-size: 11px;
     color: #aaa;
@@ -252,6 +253,10 @@
       </div>
       <div class="detail" id="detailText"></div>
       <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
+      <div class="detail" id="viaHint" style="display:none;"></div>
+      <div class="row" id="rowViaActions" style="display:none;">
+        <button id="btnResetVia">↺ Reset ke rute asli</button>
+      </div>
       <div class="coord" id="coordText"></div>
       <div class="row" id="rowActions" style="display:none;">
         <button id="btnCopy">Copy Koordinat</button>
@@ -286,7 +291,11 @@ const coordText = document.getElementById('coordText');
 const mapBox = document.getElementById('mapBox');
 let petaInstance = null;
 let layerRute = null;
+let petaKlikHandler = null;
 const rowActions = document.getElementById('rowActions');
+const viaHint = document.getElementById('viaHint');
+const rowViaActions = document.getElementById('rowViaActions');
+const btnResetVia = document.getElementById('btnResetVia');
 const roundOpt = document.getElementById('roundOpt');
 const chkBulat = document.getElementById('chkBulat');
 
@@ -323,6 +332,8 @@ function resetResult() {
   statusEl.textContent = '';
   resultEl.classList.remove('show', 'error');
   roundOpt.style.display = 'none';
+  viaHint.style.display = 'none';
+  rowViaActions.style.display = 'none';
 }
 
 // ---------- Parsing koordinat dari link ----------
@@ -416,8 +427,11 @@ async function ambilKonfigurasi() {
   return cacheKonf;
 }
 
-async function hitungRute(lat1, lng1, lat2, lng2) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+async function hitungRute(toko, tujuan, viaPoint) {
+  const titik = [toko, ...(viaPoint ? [viaPoint] : []), tujuan]
+    .map(t => `${t.lng},${t.lat}`)
+    .join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${titik}?overview=full&geometries=geojson`;
   const res = await fetch(url);
   const data = await res.json();
   if (!data.routes || !data.routes.length) throw new Error('Tidak bisa menghitung rute.');
@@ -457,7 +471,7 @@ function renderOngkir() {
 
 chkBulat.addEventListener('change', renderOngkir);
 
-function tampilkanPeta(toko, tujuan, titikRute) {
+function tampilkanPeta(toko, tujuan, titikRute, opsi) {
   mapBox.style.display = 'block';
 
   // Inisialisasi peta cuma sekali; kunjungan berikutnya tinggal update isinya
@@ -470,6 +484,7 @@ function tampilkanPeta(toko, tujuan, titikRute) {
   }
 
   if (layerRute) { petaInstance.removeLayer(layerRute); }
+  if (petaKlikHandler) { petaInstance.off('click', petaKlikHandler); petaKlikHandler = null; }
 
   // Pin custom dari CSS doang (bukan gambar dari CDN luar) - biar gak mungkin
   // gagal muat kayak masalah peta statis sebelumnya. Biru = toko, merah = tujuan.
@@ -486,8 +501,22 @@ function tampilkanPeta(toko, tujuan, titikRute) {
   const garisRute = L.polyline(titikRute, { color: '#7a1f2b', weight: 4 });
   const markerToko = L.marker([toko.lat, toko.lng], { icon: buatPin('#2196f3') }).bindPopup((toko.nama || 'Toko') + ' (toko)');
   const markerTujuan = L.marker([tujuan.lat, tujuan.lng], { icon: buatPin('#e0392b') }).bindPopup('Tujuan');
+  const semuaLayer = [garisRute, markerToko, markerTujuan];
 
-  layerRute = L.layerGroup([garisRute, markerToko, markerTujuan]).addTo(petaInstance);
+  if (opsi && opsi.viaPoint) {
+    const markerVia = L.marker([opsi.viaPoint.lat, opsi.viaPoint.lng], { icon: buatPin('#ffb300') })
+      .bindPopup('Titik koreksi rute');
+    semuaLayer.push(markerVia);
+  }
+
+  layerRute = L.layerGroup(semuaLayer).addTo(petaInstance);
+
+  mapBox.classList.toggle('klik-aktif', !!(opsi && opsi.bisaKlikPeta));
+
+  if (opsi && opsi.bisaKlikPeta) {
+    petaKlikHandler = (e) => opsi.onKlikPeta({ lat: e.latlng.lat, lng: e.latlng.lng });
+    petaInstance.on('click', petaKlikHandler);
+  }
 
   // Leaflet butuh tau ukuran kontainer yang BENAR dulu (yang tadinya display:none)
   // sebelum baru boleh fitBounds - kalau kebalik, zoom-nya salah hitung dan hasilnya
@@ -500,32 +529,94 @@ function tampilkanPeta(toko, tujuan, titikRute) {
 }
 
 // ---------- Alur bareng: dari koordinat tujuan -> tampilkan hasil ----------
-async function prosesTujuan(tujuan, tampilkanAksi) {
+let rutePakaiSekarang = null; // { toko, tujuan, konf, viaPoint, km, titikRute, bisaKoreksi } - buat handle klik koreksi rute
+
+async function hitungUlangRute() {
+  const { toko, tujuan, viaPoint } = rutePakaiSekarang;
+  const { km, titikRute } = await hitungRute(toko, tujuan, viaPoint);
+  rutePakaiSekarang.km = km;
+  rutePakaiSekarang.titikRute = titikRute;
+}
+
+function renderHasilRute() {
+  const { toko, konf, km, viaPoint } = rutePakaiSekarang;
+  const ongkir = hitungOngkir(km, konf);
+
+  ongkirAsli = ongkir;
+  renderOngkir();
+  detailText.textContent = `Jarak ± ${km.toFixed(1)} km dari ${toko.nama || 'toko'}`;
+
+  if (viaPoint) {
+    viaHint.style.display = 'block';
+    viaHint.textContent = 'Rute dikoreksi manual lewat titik yang dipilih di peta.';
+    rowViaActions.style.display = 'flex';
+  } else {
+    viaHint.style.display = 'none';
+    rowViaActions.style.display = 'none';
+  }
+}
+
+async function prosesTujuan(tujuan, tampilkanAksi, bisaKoreksi) {
   statusEl.textContent = 'Mengambil data toko & tarif...';
   const [toko, konf] = await Promise.all([ambilToko(), ambilKonfigurasi()]);
 
   statusEl.textContent = 'Menghitung jarak & rute...';
-  const { km, titikRute } = await hitungRute(toko.lat, toko.lng, tujuan.lat, tujuan.lng);
-  const ongkir = hitungOngkir(km, konf);
+  const { km, titikRute } = await hitungRute(toko, tujuan, null);
+
+  rutePakaiSekarang = { toko, tujuan, konf, viaPoint: null, km, titikRute, bisaKoreksi };
 
   lastCoord = `${tujuan.lat},${tujuan.lng}`;
-  ongkirAsli = ongkir;
   roundOpt.style.display = 'block';
-  renderOngkir();
-  detailText.textContent = `Jarak ± ${km.toFixed(1)} km dari ${toko.nama || 'toko'}`;
+  renderHasilRute();
   coordText.textContent = tampilkanAksi ? ('Koordinat: ' + lastCoord) : '';
   rowActions.style.display = tampilkanAksi ? 'flex' : 'none';
+  if (bisaKoreksi) statusEl.textContent = 'Rute keliatan salah? Klik titik di peta buat perbaiki jalurnya.';
 
-  tampilkanPeta(toko, tujuan, titikRute);
+  gambarUlangPeta();
 
   resultEl.classList.add('show');
-  statusEl.textContent = '';
 }
+
+function gambarUlangPeta() {
+  const { toko, tujuan, titikRute, viaPoint, bisaKoreksi } = rutePakaiSekarang;
+  tampilkanPeta(toko, tujuan, titikRute, {
+    viaPoint,
+    bisaKlikPeta: !!bisaKoreksi,
+    onKlikPeta: async (titik) => {
+      rutePakaiSekarang.viaPoint = titik;
+      statusEl.textContent = 'Menghitung ulang rute...';
+      try {
+        await hitungUlangRute();
+        renderHasilRute();
+        gambarUlangPeta();
+        statusEl.textContent = '';
+      } catch (err) {
+        statusEl.textContent = 'Gagal menghitung ulang: ' + err.message;
+      }
+    }
+  });
+}
+
+btnResetVia.addEventListener('click', async () => {
+  if (!rutePakaiSekarang) return;
+  rutePakaiSekarang.viaPoint = null;
+  statusEl.textContent = 'Menghitung ulang rute...';
+  try {
+    await hitungUlangRute();
+    renderHasilRute();
+    gambarUlangPeta();
+    statusEl.textContent = 'Rute keliatan salah? Klik titik di peta buat perbaiki jalurnya.';
+  } catch (err) {
+    statusEl.textContent = 'Gagal menghitung ulang: ' + err.message;
+  }
+});
 
 function tampilkanError(err) {
   resultEl.classList.add('show', 'error');
   ongkirAsli = null;
   roundOpt.style.display = 'none';
+  viaHint.style.display = 'none';
+  rowViaActions.style.display = 'none';
   argoText.textContent = 'Gagal menghitung';
   detailText.textContent = err.message;
   coordText.textContent = '';
@@ -553,7 +644,7 @@ btnCheckLink.addEventListener('click', async () => {
       tujuan = await resolveViaAppsScript(text);
     }
     if (!tujuan) throw new Error('Koordinat tidak ditemukan dari link/teks ini.');
-    await prosesTujuan(tujuan, true);
+    await prosesTujuan(tujuan, true, true);
   } catch (err) {
     tampilkanError(err);
   } finally {
@@ -568,7 +659,7 @@ btnCheckGps.addEventListener('click', async () => {
   try {
     statusEl.textContent = 'Mengambil lokasimu...';
     const posisi = await ambilPosisiGps();
-    await prosesTujuan(posisi, false);
+    await prosesTujuan(posisi, false, false);
   } catch (err) {
     tampilkanError(err);
   } finally {
