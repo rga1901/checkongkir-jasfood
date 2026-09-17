@@ -222,6 +222,12 @@
     text-align: center;
     line-height: 1.5;
   }
+  .version-tag {
+    font-size: 10px;
+    color: #ccc;
+    text-align: center;
+    margin-top: 6px;
+  }
 </style>
 
 <link rel="manifest" href="manifest.json">
@@ -285,6 +291,9 @@
     <div class="disclaimer">
       Ini estimasi berdasarkan jarak rute jalan dari toko, belum tentu 100% sama dengan ongkir final.
     </div>
+    <!-- Nama versi web (nama gunung Indonesia, ganti tiap update, harus SAMA
+         dengan CACHE_VERSION di sw.js biar konsisten) -->
+    <div class="version-tag">Merbabu</div>
   </div>
 
 <script>
@@ -313,6 +322,10 @@ let petaKlikHandler = null;
 const rowActions = document.getElementById('rowActions');
 const viaHint = document.getElementById('viaHint');
 const btnResetVia = document.getElementById('btnResetVia');
+// Tombol ini duduk di dalam container peta Leaflet, jadi klik di tombolnya
+// bakal "ketembus" ke event click Leaflet (yang dipakai buat koreksi rute
+// pas klik peta) kalau gak di-stop propagation-nya.
+L.DomEvent.disableClickPropagation(btnResetVia);
 const roundOpt = document.getElementById('roundOpt');
 const chkBulat = document.getElementById('chkBulat');
 

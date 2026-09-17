@@ -6,8 +6,8 @@
 // Versi gak lagi dinamain v1, v2, v3, dst. Tiap ada update, ganti nama versi
 // pakai nama gunung yang ada di Indonesia, bebas gunung mana aja, TAPI harus
 // beda dari nama gunung yang dipakai di versi sebelumnya. Format bebas asal
-// jelas, contoh: 'cek-ongkir-rinjani', 'cek-ongkir-semeru', dst.
-const CACHE_VERSION = 'cek-ongkir-rinjani';
+// jelas, contoh: 'cek-ongkir-merbabu', 'cek-ongkir-semeru', dst.
+const CACHE_VERSION = 'cek-ongkir-merbabu';
 const FILES_TO_CACHE = [
   './',
   './index.html',
