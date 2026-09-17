@@ -196,6 +196,25 @@
     text-align: center;
   }
   #mapBox.klik-aktif { cursor: crosshair; }
+  #btnResetVia {
+    display: none;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 14px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    padding: 0;
+    margin: 0;
+  }
   .disclaimer {
     font-size: 11px;
     color: #aaa;
@@ -252,11 +271,10 @@
         </label>
       </div>
       <div class="detail" id="detailText"></div>
-      <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
-      <div class="detail" id="viaHint" style="display:none;"></div>
-      <div class="row" id="rowViaActions" style="display:none;">
-        <button id="btnResetVia">↺ Reset ke rute asli</button>
+      <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden; position:relative;">
+        <button id="btnResetVia" title="Reset ke rute asli">✕</button>
       </div>
+      <div class="detail" id="viaHint" style="display:none;"></div>
       <div class="coord" id="coordText"></div>
       <div class="row" id="rowActions" style="display:none;">
         <button id="btnCopy">Copy Koordinat</button>
@@ -294,7 +312,6 @@ let layerRute = null;
 let petaKlikHandler = null;
 const rowActions = document.getElementById('rowActions');
 const viaHint = document.getElementById('viaHint');
-const rowViaActions = document.getElementById('rowViaActions');
 const btnResetVia = document.getElementById('btnResetVia');
 const roundOpt = document.getElementById('roundOpt');
 const chkBulat = document.getElementById('chkBulat');
@@ -333,7 +350,7 @@ function resetResult() {
   resultEl.classList.remove('show', 'error');
   roundOpt.style.display = 'none';
   viaHint.style.display = 'none';
-  rowViaActions.style.display = 'none';
+  btnResetVia.style.display = 'none';
 }
 
 // ---------- Parsing koordinat dari link ----------
@@ -549,10 +566,10 @@ function renderHasilRute() {
   if (viaPoint) {
     viaHint.style.display = 'block';
     viaHint.textContent = 'Rute dikoreksi manual lewat titik yang dipilih di peta.';
-    rowViaActions.style.display = 'flex';
+    btnResetVia.style.display = 'flex';
   } else {
     viaHint.style.display = 'none';
-    rowViaActions.style.display = 'none';
+    btnResetVia.style.display = 'none';
   }
 }
 
@@ -616,7 +633,7 @@ function tampilkanError(err) {
   ongkirAsli = null;
   roundOpt.style.display = 'none';
   viaHint.style.display = 'none';
-  rowViaActions.style.display = 'none';
+  btnResetVia.style.display = 'none';
   argoText.textContent = 'Gagal menghitung';
   detailText.textContent = err.message;
   coordText.textContent = '';

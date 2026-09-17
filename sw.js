@@ -1,7 +1,13 @@
 // Service worker Cek Ongkir Jasfood
 // Ganti CACHE_VERSION tiap kali file di-update, biar HP pelanggan/driver
 // otomatis ambil versi baru (bukan versi lama yang ke-cache).
-const CACHE_VERSION = 'cek-ongkir-v8';
+//
+// KONVENSI VERSI (baca ini kalau kamu AI lain yang lanjutin project ini):
+// Versi gak lagi dinamain v1, v2, v3, dst. Tiap ada update, ganti nama versi
+// pakai nama gunung yang ada di Indonesia, bebas gunung mana aja, TAPI harus
+// beda dari nama gunung yang dipakai di versi sebelumnya. Format bebas asal
+// jelas, contoh: 'cek-ongkir-rinjani', 'cek-ongkir-semeru', dst.
+const CACHE_VERSION = 'cek-ongkir-rinjani';
 const FILES_TO_CACHE = [
   './',
   './index.html',
