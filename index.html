@@ -196,37 +196,12 @@
     text-align: center;
   }
   #mapBox.klik-aktif { cursor: crosshair; }
-  #btnResetVia {
-    display: none;
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(0,0,0,0.55);
-    color: #fff;
-    font-size: 14px;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 1000;
-    padding: 0;
-    margin: 0;
-  }
   .disclaimer {
     font-size: 11px;
     color: #aaa;
     margin-top: 16px;
     text-align: center;
     line-height: 1.5;
-  }
-  .version-tag {
-    font-size: 10px;
-    color: #ccc;
-    text-align: center;
-    margin-top: 6px;
   }
 </style>
 
@@ -277,10 +252,11 @@
         </label>
       </div>
       <div class="detail" id="detailText"></div>
-      <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden; position:relative;">
-        <button id="btnResetVia" title="Reset ke rute asli">✕</button>
-      </div>
+      <div id="mapBox" style="display:none; height:220px; border-radius:10px; margin-top:12px; overflow:hidden;"></div>
       <div class="detail" id="viaHint" style="display:none;"></div>
+      <div class="row" id="rowViaActions" style="display:none;">
+        <button id="btnResetVia">↺ Reset ke rute asli</button>
+      </div>
       <div class="coord" id="coordText"></div>
       <div class="row" id="rowActions" style="display:none;">
         <button id="btnCopy">Copy Koordinat</button>
@@ -291,9 +267,6 @@
     <div class="disclaimer">
       Ini estimasi berdasarkan jarak rute jalan dari toko, belum tentu 100% sama dengan ongkir final.
     </div>
-    <!-- Nama versi web (nama gunung Indonesia, ganti tiap update, harus SAMA
-         dengan CACHE_VERSION di sw.js biar konsisten) -->
-    <div class="version-tag">Merbabu</div>
   </div>
 
 <script>
@@ -321,11 +294,8 @@ let layerRute = null;
 let petaKlikHandler = null;
 const rowActions = document.getElementById('rowActions');
 const viaHint = document.getElementById('viaHint');
+const rowViaActions = document.getElementById('rowViaActions');
 const btnResetVia = document.getElementById('btnResetVia');
-// Tombol ini duduk di dalam container peta Leaflet, jadi klik di tombolnya
-// bakal "ketembus" ke event click Leaflet (yang dipakai buat koreksi rute
-// pas klik peta) kalau gak di-stop propagation-nya.
-L.DomEvent.disableClickPropagation(btnResetVia);
 const roundOpt = document.getElementById('roundOpt');
 const chkBulat = document.getElementById('chkBulat');
 
@@ -333,6 +303,45 @@ let cacheToko = null;
 let cacheKonf = null;
 let lastCoord = null;
 let ongkirAsli = null; // nilai ongkir hasil hitung asli (belum dibulatkan)
+
+// Biar nggak nge-hang lama kalau server (Apps Script / OSRM) lemot atau nyangkut.
+// Timeout dulu, kasih pesan jelas, daripada nunggu tanpa kepastian.
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Server kelamaan merespons (lebih dari ' + Math.round(ms / 1000) + ' detik). Coba lagi.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Cache data toko & tarif di localStorage biar buka berikutnya nggak perlu
+// nunggu Apps Script lagi (data ini jarang berubah). TTL 30 menit.
+const CACHE_TTL_MS = 30 * 60 * 1000;
+function ambilCacheLokal(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || (Date.now() - parsed.ts) > CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch (e) {
+    return null;
+  }
+}
+function simpanCacheLokal(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) {
+    // localStorage penuh/nggak tersedia, ya sudah, skip aja
+  }
+}
 
 function toggleBtnClear() {
   btnClear.classList.toggle('show', input.value.trim().length > 0);
@@ -363,7 +372,7 @@ function resetResult() {
   resultEl.classList.remove('show', 'error');
   roundOpt.style.display = 'none';
   viaHint.style.display = 'none';
-  btnResetVia.style.display = 'none';
+  rowViaActions.style.display = 'none';
 }
 
 // ---------- Parsing koordinat dari link ----------
@@ -414,7 +423,7 @@ function isUrl(text) {
 
 async function resolveViaAppsScript(url) {
   const endpoint = SCRIPT_URL + '?action=resolveLink&url=' + encodeURIComponent(url);
-  const res = await fetch(endpoint);
+  const res = await fetchWithTimeout(endpoint, 10000);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { lat: parseFloat(data.lat), lng: parseFloat(data.lng) };
@@ -437,16 +446,21 @@ function ambilPosisiGps() {
 // ---------- Data toko & konfigurasi (di-cache per sesi) ----------
 async function ambilToko() {
   if (cacheToko) return cacheToko;
-  const res = await fetch(SCRIPT_URL + '?action=getLokasiToko');
+  const dariLokal = ambilCacheLokal('jasfood_cache_toko');
+  if (dariLokal) { cacheToko = dariLokal; return cacheToko; }
+  const res = await fetchWithTimeout(SCRIPT_URL + '?action=getLokasiToko', 10000);
   const data = await res.json();
   if (!data.toko || !data.toko.length) throw new Error('Koordinat toko belum diisi di sheet Lokasi_Toko.');
   cacheToko = data.toko[0];
+  simpanCacheLokal('jasfood_cache_toko', cacheToko);
   return cacheToko;
 }
 
 async function ambilKonfigurasi() {
   if (cacheKonf) return cacheKonf;
-  const res = await fetch(SCRIPT_URL + '?action=getKonfigurasi');
+  const dariLokal = ambilCacheLokal('jasfood_cache_konf');
+  if (dariLokal) { cacheKonf = dariLokal; return cacheKonf; }
+  const res = await fetchWithTimeout(SCRIPT_URL + '?action=getKonfigurasi', 10000);
   const data = await res.json();
   cacheKonf = {
     tarif_per_km: Number(data.tarif_per_km) || 2000,
@@ -454,6 +468,7 @@ async function ambilKonfigurasi() {
     batas_km_flat: Number(data.batas_km_flat) || 2,
     ongkir_flat: Number(data.ongkir_flat) || 3000
   };
+  simpanCacheLokal('jasfood_cache_konf', cacheKonf);
   return cacheKonf;
 }
 
@@ -462,7 +477,7 @@ async function hitungRute(toko, tujuan, viaPoint) {
     .map(t => `${t.lng},${t.lat}`)
     .join(';');
   const url = `https://router.project-osrm.org/route/v1/driving/${titik}?overview=full&geometries=geojson`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, 12000);
   const data = await res.json();
   if (!data.routes || !data.routes.length) throw new Error('Tidak bisa menghitung rute.');
   const rute = data.routes[0];
@@ -579,10 +594,10 @@ function renderHasilRute() {
   if (viaPoint) {
     viaHint.style.display = 'block';
     viaHint.textContent = 'Rute dikoreksi manual lewat titik yang dipilih di peta.';
-    btnResetVia.style.display = 'flex';
+    rowViaActions.style.display = 'flex';
   } else {
     viaHint.style.display = 'none';
-    btnResetVia.style.display = 'none';
+    rowViaActions.style.display = 'none';
   }
 }
 
@@ -646,7 +661,7 @@ function tampilkanError(err) {
   ongkirAsli = null;
   roundOpt.style.display = 'none';
   viaHint.style.display = 'none';
-  btnResetVia.style.display = 'none';
+  rowViaActions.style.display = 'none';
   argoText.textContent = 'Gagal menghitung';
   detailText.textContent = err.message;
   coordText.textContent = '';
