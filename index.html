@@ -259,7 +259,7 @@
       </div>
       <div class="coord" id="coordText"></div>
       <div class="row" id="rowActions" style="display:none;">
-        <button id="btnCopy">Copy Koordinat</button>
+        <button id="btnStreet">Street View</button>
         <button id="btnMaps">Buka di Maps</button>
       </div>
     </div>
@@ -281,7 +281,7 @@ const input = document.getElementById('input');
 const btnClear = document.getElementById('btnClear');
 const btnCheckLink = document.getElementById('btnCheckLink');
 const btnCheckGps = document.getElementById('btnCheckGps');
-const btnCopy = document.getElementById('btnCopy');
+const btnStreet = document.getElementById('btnStreet');
 const btnMaps = document.getElementById('btnMaps');
 const statusEl = document.getElementById('status');
 const resultEl = document.getElementById('result');
@@ -712,12 +712,9 @@ btnCheckGps.addEventListener('click', async () => {
   }
 });
 
-btnCopy.addEventListener('click', () => {
+btnStreet.addEventListener('click', () => {
   if (!lastCoord) return;
-  navigator.clipboard.writeText(lastCoord).then(() => {
-    statusEl.textContent = 'Koordinat udah ke-copy!';
-    setTimeout(() => statusEl.textContent = '', 2000);
-  });
+  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lastCoord}`, '_blank');
 });
 
 btnMaps.addEventListener('click', () => {

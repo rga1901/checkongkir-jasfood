@@ -7,7 +7,7 @@
 // pakai nama gunung yang ada di Indonesia, bebas gunung mana aja, TAPI harus
 // beda dari nama gunung yang dipakai di versi sebelumnya. Format bebas asal
 // jelas, contoh: 'cek-ongkir-lawu', 'cek-ongkir-semeru', dst.
-const CACHE_VERSION = 'cek-ongkir-lawu';
+const CACHE_VERSION = 'cek-ongkir-semeru';
 const FILES_TO_CACHE = [
   './',
   './index.html',
